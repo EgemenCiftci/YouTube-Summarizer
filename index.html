@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Summarizer</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+
+<body>
+    <h2>YouTube Summarizer</h2>
+    <input type="password" id="geminiApiKey" placeholder="Gemini API Key">
+    <input type="text" id="youtubeUrl" placeholder="YouTube URL">
+    <select id="language">
+        <option value="Same" selected>Same</option>
+        <option value="English">English</option>
+        <option value="Turkish">Turkish</option>
+    </select>
+    <button id="summarizeButton" onclick="processVideo()">Summarize</button>
+    <br />
+    <div id="output"></div>
+
+    <script type="module">
+        import { GoogleGenerativeAI } from "https://cdn.jsdelivr.net/npm/@google/generative-ai/+esm";
+
+        const geminiApiKeyInput = document.getElementById("geminiApiKey");
+        geminiApiKeyInput.value = window.localStorage.getItem("geminiApiKey");
+
+        window.processVideo = async function () {
+            if (geminiApiKeyInput.value) {
+                window.localStorage.setItem("geminiApiKey", geminiApiKeyInput.value);
+            } else {
+                alert("Please enter a valid Gemini API key. You can get one from https://aistudio.google.com/ for free.");
+                return;
+            }
+
+            const genAI = new GoogleGenerativeAI(geminiApiKeyInput.value);
+
+            const url = document.getElementById("youtubeUrl").value;
+
+            if (!url) {
+                alert("Please enter a valid YouTube URL!");
+                return;
+            }
+
+            const button = document.getElementById("summarizeButton");
+            const output = document.getElementById("output");
+            button.disabled = true;
+            output.innerText = "Processing...";
+
+            try {
+                const model = genAI.getGenerativeModel({ model: "gemini-2.0-pro-exp-02-05" });
+                const chatSession = model.startChat({
+                    generationConfig: {
+                        temperature: 1,
+                        topP: 0.95,
+                        topK: 64,
+                        maxOutputTokens: 8192,
+                        responseMimeType: "text/plain",
+                    },
+                    history: [
+                        {
+                            role: "user",
+                            parts: [
+                                {
+                                    fileData: {
+                                        mimeType: "video/*",
+                                        fileUri: url,
+                                    },
+                                },
+                            ],
+                        },
+                    ],
+                });
+
+                const language = document.getElementById("language").value;
+                const isSame = language === "Same";
+                const result = await chatSession.sendMessage(`Summarize in key points using ${isSame ? 'the same language as the video' : (language + ' language')}.`);
+                output.innerHTML = marked.parse(result.response.text());
+            } catch (error) {
+                output.innerText = "An error occurred while processing the video.";
+                console.error(error);
+            } finally {
+                button.disabled = false;
+            }
+        }
+    </script>
+</body>
+
+</html>
